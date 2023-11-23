@@ -29,7 +29,7 @@ impl TryFrom<(&VirtualMachine, &[Lease])> for Host {
                     }
                 }
             })
-            .filter_map(|mac| leases.iter().find(|l| l.mac_address == mac))
+            .filter_map(|mac| leases.iter().find(|l| l.active_mac_address == Some(mac)))
             .map(|l| l.address)
             .collect();
         Ok(Self {
@@ -55,7 +55,7 @@ impl TryFrom<(&Container, &[Lease])> for Host {
                     }
                 }
             })
-            .filter_map(|mac| leases.iter().find(|l| l.mac_address == mac))
+            .filter_map(|mac| leases.iter().find(|l| l.active_mac_address == Some(mac)))
             .map(|l| l.address)
             .collect();
         Ok(Self {

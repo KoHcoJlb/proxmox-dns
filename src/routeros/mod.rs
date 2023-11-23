@@ -1,4 +1,5 @@
 use std::net::Ipv4Addr;
+
 use macaddr::MacAddr6;
 use reqwest::Url;
 use serde::Deserialize;
@@ -24,8 +25,8 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub struct Lease {
     #[serde_as(as = "DisplayFromStr")]
     pub address: Ipv4Addr,
-    #[serde_as(as = "DisplayFromStr")]
-    pub mac_address: MacAddr6,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub active_mac_address: Option<MacAddr6>,
 }
 
 pub struct Client {
