@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use futures::join;
+use hickory_proto::rr::rdata::SRV;
 use hickory_server::authority::{Authority, AuthorityObject, Catalog, ZoneType};
 use hickory_server::proto::rr::{Name, Record};
 use hickory_server::proto::rr::rdata::{A, SOA};
@@ -86,15 +87,26 @@ async fn update_loop(config: Config, pve_client: proxmox::Client, ros_client: ro
             .flat_map(|h| h.ips.into_iter().flat_map(|ip| {
                 let zone = Some(zone.origin().into());
                 let data = A::from(ip);
+                let name = Name::parse(&h.name, zone.as_ref()).unwrap();
                 [
-                    Record::from_rdata(Name::parse(&h.name, zone.as_ref()).unwrap(), 60, data),
-                    Record::from_rdata(Name::parse(ALL_DOMAIN, zone.as_ref()).unwrap(), 60, data)
+                    Record::from_rdata(
+                        name.clone(), 60, data,
+                    ).into_record_of_rdata(),
+                    Record::from_rdata(
+                        Name::parse(ALL_DOMAIN, zone.as_ref()).unwrap(),
+                        60, data,
+                    ).into_record_of_rdata(),
+                    Record::from_rdata(
+                        Name::parse(ALL_DOMAIN, zone.as_ref()).unwrap(),
+                        60,
+                        SRV::new(0, 0, 0, name),
+                    ).into_record_of_rdata()
                 ]
             }).collect::<Vec<_>>());
 
         let mut tmp_zone = create_zone(config);
         for r in records {
-            tmp_zone.upsert_mut(r.into_record_of_rdata(), 0);
+            tmp_zone.upsert_mut(r, 0);
         }
 
         let mut records = zone.records_mut().await;
