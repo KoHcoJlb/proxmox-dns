@@ -48,7 +48,7 @@ struct Config {
 
 fn create_zone(config: &Config) -> InMemoryAuthority {
     let soa = Record::from_rdata(config.domain.clone(), 300, SOA::new(
-        config.domain.clone(), config.domain.clone(), 0, 0, 0, 0, 0,
+        config.domain.clone(), config.domain.clone(), 0, 0, 0, 0, 60,
     ));
     let mut zone = InMemoryAuthority::empty(config.domain.clone(), ZoneType::Primary, true);
     zone.upsert_mut(soa.into_record_of_rdata(), 0);
