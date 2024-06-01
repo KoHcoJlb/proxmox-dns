@@ -21,10 +21,8 @@ pub struct ContainerConfig {
     pub nets: BTreeMap<u32, Spec<LXCNet>>,
 }
 
-#[serde_as]
 #[derive(Deserialize, Debug)]
 pub struct Container {
-    #[serde_as(as = "DisplayFromStr")]
     pub vmid: u32,
     pub name: String,
     #[serde(skip)]
