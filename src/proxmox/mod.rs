@@ -78,6 +78,7 @@ impl Client {
                 .headers(self.auth_header())
                 .send()
                 .await?
+            .error_for_status()?
                 .text()
                 .await?,
         )?

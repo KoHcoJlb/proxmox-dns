@@ -61,6 +61,7 @@ impl Client {
             .basic_auth(&self.username, Some(&self.password))
             .send()
             .await?
+        .error_for_status()?
             .text()
             .await?;
 
