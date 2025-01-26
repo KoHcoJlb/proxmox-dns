@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use macaddr::MacAddr6;
 use reqwest::Url;
 use serde::Deserialize;
-use serde_with::{DisplayFromStr, serde_as};
+use serde_with::{serde_as, DisplayFromStr};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -55,14 +55,15 @@ impl Client {
         let mut u = self.url.clone();
         u.set_path(&format!("/rest/{path}"));
 
-        let text = self.client.get(u)
+        let text = self
+            .client
+            .get(u)
             .basic_auth(&self.username, Some(&self.password))
-            .send().await?
-            .text().await?;
+            .send()
+            .await?
+            .text()
+            .await?;
 
-        Ok(serde_json::from_str(&text).map_err(|err| Error::Serde {
-            err,
-            text,
-        })?)
+        Ok(serde_json::from_str(&text).map_err(|err| Error::Serde { err, text })?)
     }
 }

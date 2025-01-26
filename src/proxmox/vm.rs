@@ -4,8 +4,8 @@ use futures::future::join_all;
 use serde::Deserialize;
 use tracing::error;
 
-use super::{Client, Result};
 use super::ser::{Prefix, Spec};
+use super::{Client, Result};
 
 #[derive(Debug, Default)]
 pub struct VMNet;
@@ -36,13 +36,15 @@ impl Client {
     pub async fn virtual_machines(&self, node: &str) -> Result<Vec<VirtualMachine>> {
         let mut vms: Vec<VirtualMachine> = self.get(format!("nodes/{node}/qemu")).await?;
 
-        let configs = join_all(vms.iter()
-            .map(|vm| self.virtual_machine_config(node, vm.vmid)))
-            .await;
+        let configs = join_all(
+            vms.iter()
+                .map(|vm| self.virtual_machine_config(node, vm.vmid)),
+        )
+        .await;
         for (vm, config) in vms.iter_mut().zip(configs) {
             match config {
                 Ok(config) => vm.config = Some(config),
-                Err(err) => error!(vmid = vm.vmid, ?err, "get vm config")
+                Err(err) => error!(vmid = vm.vmid, ?err, "get vm config"),
             }
         }
 

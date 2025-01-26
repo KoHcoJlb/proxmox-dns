@@ -1,11 +1,11 @@
-use reqwest::header::{AUTHORIZATION, HeaderMap};
+use reqwest::header::{HeaderMap, AUTHORIZATION};
 use reqwest::Url;
 use serde::Deserialize;
 use thiserror::Error;
 
-pub mod vm;
 pub mod lxc;
 mod ser;
+pub mod vm;
 
 #[derive(Deserialize)]
 struct Data<D> {
@@ -28,11 +28,10 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn deserialize<T>(text: String) -> Result<T>
-where for<'a> T: Deserialize<'a> {
-    serde_json::from_str(&text).map_err(|err| Error::Serde {
-        err,
-        text,
-    })
+where
+    for<'a> T: Deserialize<'a>,
+{
+    serde_json::from_str(&text).map_err(|err| Error::Serde { err, text })
 }
 
 pub struct Client {
@@ -59,7 +58,9 @@ impl Client {
         let mut headers = HeaderMap::new();
         headers.insert(
             AUTHORIZATION,
-            format!("PVEAPIToken={}={}", self.username, self.tokenid).try_into().unwrap(),
+            format!("PVEAPIToken={}={}", self.username, self.tokenid)
+                .try_into()
+                .unwrap(),
         );
         headers
     }
@@ -71,9 +72,15 @@ impl Client {
     }
 
     async fn get<S: AsRef<str>, T: for<'a> Deserialize<'a>>(&self, path: S) -> Result<T> {
-        Ok(deserialize::<Data<T>>(self.client.get(self.endpoint(path))
-            .headers(self.auth_header())
-            .send().await?
-            .text().await?)?.data)
+        Ok(deserialize::<Data<T>>(
+            self.client
+                .get(self.endpoint(path))
+                .headers(self.auth_header())
+                .send()
+                .await?
+                .text()
+                .await?,
+        )?
+        .data)
     }
 }

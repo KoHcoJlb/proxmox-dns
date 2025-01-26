@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 
 use futures::future::join_all;
 use serde::Deserialize;
-use serde_with::{DisplayFromStr, serde_as};
+use serde_with::{serde_as, DisplayFromStr};
 use tracing::error;
 
-use super::{Client, Result};
 use super::ser::{Prefix, Spec};
+use super::{Client, Result};
 
 #[derive(Debug, Default)]
 pub struct LXCNet;
@@ -37,13 +37,11 @@ impl Client {
     pub async fn containers(&self, node: &str) -> Result<Vec<Container>> {
         let mut cts: Vec<Container> = self.get(format!("nodes/{node}/lxc")).await?;
 
-        let configs = join_all(cts.iter()
-            .map(|vm| self.container_config(node, vm.vmid)))
-            .await;
+        let configs = join_all(cts.iter().map(|vm| self.container_config(node, vm.vmid))).await;
         for (vm, config) in cts.iter_mut().zip(configs) {
             match config {
                 Ok(config) => vm.config = Some(config),
-                Err(err) => error!(vmid = vm.vmid, ?err, "get container config")
+                Err(err) => error!(vmid = vm.vmid, ?err, "get container config"),
             }
         }
 
