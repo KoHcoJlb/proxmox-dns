@@ -1,70 +1,67 @@
 use std::net::Ipv4Addr;
 
+use anyhow::{anyhow, bail, Context, Result};
 use macaddr::MacAddr6;
-use reqwest::Url;
-use serde::Deserialize;
-use serde_with::{serde_as, DisplayFromStr};
-use thiserror::Error;
+use mikrotik_rs::protocol::command::CommandBuilder;
+use mikrotik_rs::protocol::CommandResponse;
+use mikrotik_rs::MikrotikDevice;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("request error: {0}")]
-    Request(#[from] reqwest::Error),
-    #[error("deserialization error: {err}: {text}")]
-    Serde {
-        err: serde_json::Error,
-        text: String,
-    },
-}
-
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[serde_as]
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug)]
 pub struct Lease {
-    #[serde_as(as = "DisplayFromStr")]
     pub address: Ipv4Addr,
-    #[serde_as(as = "Option<DisplayFromStr>")]
     pub active_mac_address: Option<MacAddr6>,
 }
 
 pub struct Client {
-    url: Url,
-    username: String,
-    password: String,
-
-    client: reqwest::Client,
+    device: MikrotikDevice,
 }
 
 impl Client {
-    pub fn new(url: &str, username: &str, password: &str) -> anyhow::Result<Self> {
+    pub async fn connect(addr: &str, username: &str, password: &str) -> Result<Self> {
         Ok(Self {
-            url: url.try_into()?,
-            username: username.into(),
-            password: password.into(),
-            client: reqwest::Client::new(),
+            device: MikrotikDevice::connect(addr, username, Some(password)).await?,
         })
     }
 
     pub async fn leases(&self) -> Result<Vec<Lease>> {
-        self.get("ip/dhcp-server/lease").await
-    }
+        let mut res = self
+            .device
+            .send_command(
+                CommandBuilder::new()
+                    .command("/ip/dhcp-server/lease/print")
+                    .build(),
+            )
+            .await
+            .context("execute command")?;
 
-    async fn get<T: for<'a> Deserialize<'a>>(&self, path: &str) -> Result<T> {
-        let mut u = self.url.clone();
-        u.set_path(&format!("/rest/{path}"));
+        let mut leases = vec![];
+        while let Some(msg) = res.recv().await {
+            match msg.context("routeros msg")? {
+                CommandResponse::Reply(res) => leases.push(Lease {
+                    address: res
+                        .attributes
+                        .get("address")
+                        .map(|i| i.as_ref())
+                        .flatten()
+                        .ok_or(anyhow!("no address: {res:?}"))?
+                        .parse()
+                        .context(format!("parse address: {res:?}"))?,
+                    active_mac_address: res
+                        .attributes
+                        .get("active-mac-address")
+                        .map(|i| i.as_ref())
+                        .flatten()
+                        .map(|s| {
+                            s.parse()
+                                .context(format!("parse active-mac-address: {res:?}"))
+                        })
+                        .transpose()?,
+                }),
+                CommandResponse::Done(_) => {}
+                res => bail!("unexpected response: {:?}", res),
+            }
+        }
 
-        let text = self
-            .client
-            .get(u)
-            .basic_auth(&self.username, Some(&self.password))
-            .send()
-            .await?
-        .error_for_status()?
-            .text()
-            .await?;
-
-        Ok(serde_json::from_str(&text).map_err(|err| Error::Serde { err, text })?)
+        Ok(leases)
     }
 }

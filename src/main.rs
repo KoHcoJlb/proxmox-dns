@@ -34,7 +34,7 @@ struct PveConfig {
 
 #[derive(Debug, Deserialize)]
 struct RosConfig {
-    url: String,
+    addr: String,
     username: String,
     password: String,
 }
@@ -82,7 +82,7 @@ async fn update_loop(
         let hosts: Vec<Host> = vms
             .into_iter()
             .filter_map(|vm| {
-                ((&vm, leases.as_slice()))
+                (&vm, leases.as_slice())
                     .try_into()
                     .map(Some)
                     .unwrap_or_else(|err| {
@@ -152,6 +152,8 @@ async fn update_loop(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _ = dotenvy::dotenv();
+
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
@@ -173,7 +175,8 @@ async fn main() -> Result<()> {
     let pve_client =
         proxmox::Client::new(&config.pve.url, &config.pve.username, &config.pve.tokenid)?;
     let ros_client =
-        routeros::Client::new(&config.ros.url, &config.ros.username, &config.ros.password)?;
+        routeros::Client::connect(&config.ros.addr, &config.ros.username, &config.ros.password)
+            .await?;
 
     task::spawn(update_loop(config, pve_client, ros_client, zone.clone()));
 
